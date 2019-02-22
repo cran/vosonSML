@@ -1,60 +1,46 @@
-#' Create networks from social media data
+#' @title Create networks from social media data
 #'
-#' This function creates networks from social media data (i.e. from data frames
-#' of class \code{dataSource}. \code{Create} is the final step of the
-#' \code{Authenticate}, \code{Collect}, \code{Create} workflow. This function is
-#' a convenient UI wrapper to the core Create*Network family of functions.
+#' @description This function creates networks from social media data as produced from \code{\link{Collect}}. 
+#' \code{Create} is the final step of the \code{\link{Authenticate}}, \code{\link{Collect}} and \code{Create} workflow.
+#' 
+#' There are three types of networks that can be created from collected data: \code{actor}, \code{bimodal} or 
+#' \code{semantic}.
+#' 
+#' For \code{actor} networks refer to \code{\link{Create.actor.twitter}}, \code{\link{Create.actor.youtube}} and 
+#' \code{\link{Create.actor.reddit}} for parameters and usage.
+#' 
+#' For \code{bimodal} and \code{semantic} networks refer to \code{\link{Create.bimodal.twitter}} and 
+#' \code{\link{Create.semantic.twitter}} functions for parameters and usage respectively. 
 #'
-#' Note: when creating Twitter networks, the user information
-#' can be collected separately using the \code{\link{PopulateUserInfo}} function
-#' and stored into the network as vertex attributes (this involves additional
-#' calls to the Twitter API).
+#' @param datasource Collected social media data of class \code{"datasource"} and \code{socialmedia}.
+#' @param type Character string. Type of network to be created, can be \code{"actor"}, \code{"bimodal"} or 
+#' \code{"semantic"}.
+#' @param ... Optional parameters to pass to functions providied by supporting R packages that are used for social 
+#' media network creation.
 #'
-#' @param dataSource a data frame of class \code{dataSource}
-#' @param type character, type of network to be created, currently supports
-#' "actor", "bimodal", "dynamic", "semantic" and "ego"
-#' @param ... additional parameters for Create*Network functions
-#' @return An igraph graph object
-#' @author Chung-hong Chan <chainsawtiney@@gmail.com>
-#' @seealso \code{\link{CreateActorNetwork}},
-#' \code{\link{CreateBimodalNetwork}}, \code{\link{CreateDynamicNetwork}},
-#' \code{\link{CreateSemanticNetwork}}, \code{\link{CreateEgoNetworkFromData}}
-#' @examples
-#'
-#' \dontrun{
-#' require(magrittr)
-#' ## Instagram ego network example
-#' myAppID <- "123456789098765"
-#' myAppSecret <- "abc123abc123abc123abc123abc123ab"
-#' myUsernames <- c("senjohnmccain","obama")
-#'
-#' Authenticate("instagram",
-#' appID = myAappId,
-#' appSecret = myAppSecret) %>% Collect(ego = TRUE,
-#' username = myUsernames) %>% Create
-#'
-#' ## YouTube actor network example
-#' my_apiKeyYoutube <- "314159265358979qwerty"
-#' videoIDs <- c("W2GZFeYGU3s","mL27TAJGlWc")
-#'
-#' Authenticate("youtube",
-#' apiKey = my_apiKeyYoutube) %>% Collect(videoIDs = videoIDs) %>% Create('actor')
-#' }
 #' @export
-Create <- function(dataSource, type = "Actor", ...) {
-    if (inherits(dataSource, "ego")) {
-        return(CreateEgoNetworkFromData(dataSource)) ## you cannot create actor out of ego data
-    }
-    creator <- switch(tolower(type),
-                      actor = CreateActorNetwork,
-                      bimodal = CreateBimodalNetwork,
-                      dynamic = CreateDynamicNetwork,
-                      semantic = CreateSemanticNetwork,
-                      ego = CreateEgoNetworkFromData,
-                      stop("Unknown Type")
-                      )
-    # return()
-    networkToReturn <- creator(dataSource, ...)
-    class(networkToReturn) <- append(class(networkToReturn),c("vosonSML"))
-    return(networkToReturn)
+Create <- function(datasource, type, ...) {
+  # searches the class list of datasource for matching method
+  UseMethod("Create", type)
+}
+
+#' @export
+Create.default <- function(datasource, type, ...) {
+  # check if network type is a character string
+  if (!is.character(type)) {
+    stop("Create network type should be a character string.", call. = FALSE) 
+  }
+  
+  # check if function exists for network type
+  # todo: perhaps search create methods so this can be extensible
+  func_name <- paste0("Create", ".", type)
+  if (!exists(func_name, where = asNamespace("vosonSML"), mode = "function")) {
+    stop("Unknown network type passed to create.", call. = FALSE) 
+  }
+  
+  # add social media type to value class list
+  class(type) <- append(class(type), type)
+  
+  # call authenticate
+  Create(datasource, type, ...)
 }

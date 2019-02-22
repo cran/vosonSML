@@ -2,70 +2,23 @@
 % Please edit documentation in R/Authenticate.R
 \name{Authenticate}
 \alias{Authenticate}
-\title{Create credential to access social media APIs}
+\title{Create a credential object to access social media APIs}
 \usage{
 Authenticate(socialmedia, ...)
 }
 \arguments{
-\item{socialmedia}{character string, social media API to authenticate,
-currently supports "facebook", "youtube", "twitter" and "instagram"}
+\item{socialmedia}{Character string. Identifier for social media API to authenticate with. Supported social media
+are \code{"twitter"}, \code{"youtube"} and \code{"reddit"}.}
 
-\item{...}{additional parameters for authentication
-
-\code{facebook}: appID, appSecret
-
-\code{youtube}: apiKey
-
-\code{twitter}: apiKey, apiSecret, accessToken, accessTokenSecret
-
-\code{instagram}: appID, appSecret}
-}
-\value{
-credential object with authentication information
+\item{...}{Optional parameters to pass to functions providied by supporting R packages that are used for social media 
+API access.}
 }
 \description{
-\code{Authenticate} creates a \code{credential} object that enables R to
-make authenticated calls to social media APIs.  A \code{credential} object
-is a S3 object with the authentication-related information such as access
-tokens and the information on the social media that grant authentication.
-\code{Authenticate} is the first step of the \code{Authenticate},
-\code{Collect}, \code{Create} workflow.
-}
-\note{
-Currently, \code{Authenticate} with socialmedia = "twitter" generates
-oauth information to be used in the current active session only (i.e.
-"side-effect") and no authentication-related information will be stored in
-the returned \code{credential} object.
-}
-\examples{
+\code{Authenticate} creates a \code{credential} object that enables R to make authenticated calls to social media
+APIs. A \code{credential} object is a S3 object containing authentication related information such as an access 
+token or key, and a class name identifying the social media that grants authentication. \code{Authenticate} is the 
+first step of the \code{Authenticate}, \code{\link{Collect}} and \code{\link{Create}} workflow.
 
-\dontrun{
-require(magrittr)
-## Instagram ego network example
-myAppID <- "123456789098765"
-myAppSecret <- "abc123abc123abc123abc123abc123ab"
-myUsernames <- c("senjohnmccain","obama")
-
-Authenticate("instagram",
-appID = myAappId,
-appSecret = myAppSecret) \%>\% Collect(ego = TRUE,
-username = myUsernames) \%>\% Create
-
-## YouTube actor network example
-my_apiKeyYoutube <- "314159265358979qwerty"
-videoIDs <- c("W2GZFeYGU3s","mL27TAJGlWc")
-
-Authenticate("youtube",
-apiKey = my_apiKeyYoutube) \%>\% Collect(videoIDs = videoIDs) \%>\% Create('actor')
-}
-}
-\seealso{
-\code{\link{AuthenticateWithFacebookAPI}},
-\code{\link{AuthenticateWithInstagramAPI}},
-\code{\link{AuthenticateWithYoutubeAPI}},
-\code{\link{AuthenticateWithTwitterAPI}}, \code{\link{SaveCredential}},
-\code{\link{LoadCredential}}
-}
-\author{
-Chung-hong Chan <chainsawtiney@gmail.com>
+Refer to \code{\link{Authenticate.twitter}}, \code{\link{Authenticate.youtube}} and 
+\code{\link{Authenticate.reddit}} for parameters and usage.
 }
