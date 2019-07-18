@@ -18,7 +18,8 @@
 #' @name vosonSML-package
 #' @aliases vosonSML-package vosonSML
 #' @docType package
-#' @author Created by Timothy Graham and Robert Ackland, with major contributions by Chung-hong Chan and Bryan Gertzel.
+#' @author Created by Timothy Graham and Robert Ackland with major contributions by Chung-hong Chan. The current lead 
+#' developer and maintainer is Bryan Gertzel.
 #' @import tm
 #' @import RCurl
 #' @import data.table
@@ -34,6 +35,8 @@
 #' @importFrom RedditExtractoR reddit_content user_network
 #' @importFrom magrittr '%>%' '%<>%'
 #' @importFrom dplyr rename group_by summarise ungroup left_join select mutate filter coalesce row_number
-#' distinct anti_join mutate_all mutate_at ends_with vars funs bind_rows
+#' distinct anti_join mutate_all mutate_at ends_with vars funs bind_rows arrange
 #' @importFrom rlang '.data'
+#' @importFrom textutils HTMLdecode
+#' @importFrom tictoc tic toc
 NULL

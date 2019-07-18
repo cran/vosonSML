@@ -1,17 +1,15 @@
 #' @title Twitter API authentication
 #' 
-#' @description Twitter authentication uses OAuth and requires Application-user authentication API keys as described here: 
+#' @description Twitter authentication uses OAuth and either requires authorization of the rtweet package rstats2twitter
+#' client app by a registered twitter user or twitter app developer API keys as described here: 
 #' \url{https://developer.twitter.com/en/docs/basics/authentication/overview/oauth}.
 #' 
 #' @param socialmedia Character string. Identifier for social media API to authenticate, set to \code{"twitter"}.
 #' @param appName Character string. Registered twitter app name associated with the API keys.
-#' @param apiKey Character string. API key to authenticate.
-#' @param apiSecret Character string. API secret to authenticate.
+#' @param apiKey Character string. API consumer key to authenticate.
+#' @param apiSecret Character string. API consumer secret to authenticate.
 #' @param accessToken Character string. API access token to authenticate.
 #' @param accessTokenSecret Character string. API access token secret to authenticate.
-#' @param useCachedToken Logical. Use cached access token if found otherwise create one. The cached token file is 
-#' named \code{.twitter-oauth} and saved to the working directory.To refresh the cached token this file has to be 
-#' manually deleted. Default is \code{TRUE}.
 #' @param ... Additional parameters passed to function. Not used in this method.
 #' 
 #' @return A \code{credential} object containing an access token \code{$auth} and social media type descriptor 
@@ -19,59 +17,53 @@
 #' 
 #' @examples
 #' \dontrun{
-#' # twitter authentication with api keys
-#' myKeys <- list(appName = "vosonSML", apiKey = "xxxxxxxxxxxx",
+#' # twitter authentication via user authorization of app on their account
+#' # will open a web browser to twitter prompting the user to log in and authorize the app
+#' # apiKey and apiSecret are equivalent to a twitter apps consumer key and secret
+#' twitterAuth <- Authenticate("twitter", appName = "An App",
+#'   apiKey = "xxxxxxxxxxxx", apiSecret = "xxxxxxxxxxxx"
+#' )
+#' 
+#' # twitter authentication with developer app api keys
+#' myDevKeys <- list(appName = "My App", apiKey = "xxxxxxxxxxxx",
 #'   apiSecret = "xxxxxxxxxxxx", accessToken = "xxxxxxxxxxxx",
 #'   accessTokenSecret = "xxxxxxxxxxxx")
 #' 
-#' twitterAuth <- Authenticate("twitter", appName = myKeys$appName, 
-#'   apiKey = myKeys$apiKey, apiSecret = myKeys$apiSecret, accessToken = myKeys$accessToken, 
-#'   accessTokenSecret = myKeys$accessTokenSecret, useCachedToken = TRUE)
+#' twitterAuth <- Authenticate("twitter", appName = myDevKeys$appName, 
+#'   apiKey = myDevKeys$apiKey, apiSecret = myDevKeys$apiSecret, accessToken = myDevKeys$accessToken, 
+#'   accessTokenSecret = myDevKeys$accessTokenSecret)
 #' }
 #' 
 #' @export
-Authenticate.twitter <- function(socialmedia, appName, apiKey, apiSecret, accessToken, accessTokenSecret,
-                                 useCachedToken = TRUE, ...) {
-  
-  if (missing(apiKey) || missing(apiSecret) || missing(accessToken) || missing(accessTokenSecret)) {
-    stop("Missing one or more twitter API keys.", call. = FALSE)
-  }
-  
-  if (missing(appName)) {
-    appName <- "vosonSML-twitter"
-  }
-  
-  twitter_oauth <- NULL
-  token_file_name <- ".twitter-oauth"
-  
+Authenticate.twitter <- function(socialmedia, appName, apiKey, apiSecret, accessToken, accessTokenSecret, ...) {
   credential <- list(socialmedia = "twitter", auth = NULL)
-  class(credential) <- append(class(credential), c("credential", "twitter"))
+  class(credential) <- append(class(credential), c("credential", "twitter"))   
+
+  if (missing(appName)) {
+    stop("Missing twitter app name.", call. = FALSE)
+  } 
   
-  if (useCachedToken) {
-    if (file.exists(token_file_name)) {
-      cat("Cached twitter token was found (using cached token).\n")
-      twitter_oauth <- LoadCredential(token_file_name)
-      # todo: check loaded token is valid before returning
-      credential$auth <- twitter_oauth
-      return(credential)
-    } else {
-      cat("OAuth token not found. A token will be created and saved to the working directory.\n")
-    }
+  if (missing(apiKey) || missing(apiSecret)) {
+    stop("Missing twitter consumer API keys.", call. = FALSE)
   }
   
-  twitter_oauth <- rtweet::create_token(
+  if (missing(accessToken) || missing(accessTokenSecret)) {
+    credential$auth <- rtweet::create_token(
+      app = appName,
+      consumer_key = apiKey,
+      consumer_secret = apiSecret,
+      set_renv = FALSE)
+    
+    return(credential)
+  }
+  
+  credential$auth <- rtweet::create_token(
     app = appName,
     consumer_key = apiKey,
     consumer_secret = apiSecret,
     access_token = accessToken,
     access_secret = accessTokenSecret,
     set_renv = FALSE)
-  
-  if (useCachedToken) {
-    SaveCredential(twitter_oauth, file = token_file_name)
-  }
-  
-  credential$auth <- twitter_oauth
   
   return(credential)
 }
