@@ -6,31 +6,32 @@
 #' without relations to other users will appear in the network graph as isolate nodes.
 #' 
 #' @note When creating twitter actor networks, a network with additional user information can be generated using the
-#' \code{\link{AddTwitterUserData}} function. Additional calls can be made to the twitter API to get information
+#' \code{\link{AddUserData}} function. Additional calls can be made to the twitter API to get information
 #' about users that were identified as nodes during network creation but did not tweet (meaning no user profile 
 #' information was initially collected for them).
 #' 
 #' @param datasource Collected social media data with \code{"datasource"} and \code{"twitter"} class names.
 #' @param type Character string. Type of network to be created, set to \code{"actor"}.
-#' @param writeToFile Logical. Save network data to a file in the current working directory. Default is \code{FALSE}.
-#' @param verbose Logical. Output additional information about the network creation. Default is \code{FALSE}.
+#' @param verbose Logical. Output additional information about the network creation. Default is \code{TRUE}.
 #' @param ... Additional parameters passed to function. Not used in this method.
 #' 
-#' @return Named list containing dataframes with the relations between actors (directed edges) \code{$relations},
-#' the actors (including isolates) \code{$users} and generated actor network as igraph object \code{$graph}.
+#' @return Network as a named list of two dataframes containing \code{$nodes} and \code{$edges}.
 #' 
 #' @examples
 #' \dontrun{
 #' # create a twitter actor network graph and output to console additional information 
 #' # during network creation (verbose)
-#' actorNetwork <- twitterData %>% Create("actor", writeToFile = TRUE, verbose = TRUE)
+#' actorNetwork <- twitterData %>% Create("actor")
 #' 
-#' # igraph object
-#' # actorNetwork$graph
+#' # network
+#' # actorNetwork$nodes
+#' # actorNetwork$edges
 #' }
 #' 
 #' @export
-Create.actor.twitter <- function(datasource, type, writeToFile = FALSE, verbose = FALSE, ...) {
+Create.actor.twitter <- function(datasource, type, verbose = TRUE, ...) {
+  cat("Generating twitter actor network...")
+  if (verbose) { cat("\n") }
   
   from <- to <- edge_type <- timestamp <- status_id <- NULL
   is_retweet <- is_quote <- mentions_user_id <- reply_to_user_id <- NULL
@@ -38,10 +39,9 @@ Create.actor.twitter <- function(datasource, type, writeToFile = FALSE, verbose 
   df <- datasource
   df <- data.table(df)
   
-  df_stats <- networkStats(NULL, "collected tweets", nrow(df))
+  # df <- tibble::as_tibble(datasource)
   
-  cat("Generating twitter actor network...\n")
-  flush.console()
+  df_stats <- networkStats(NULL, "collected tweets", nrow(df))
   
   df_users <- data.frame("user_id" = character(0), "screen_name" = character(0))
   df_users <- rbind(df_users, subset(df, select = c("user_id", "screen_name"), stringsAsFactors = FALSE))
@@ -176,6 +176,29 @@ Create.actor.twitter <- function(datasource, type, writeToFile = FALSE, verbose 
   }
   df_stats <- networkStats(df_stats, "replies", count, TRUE)
   
+  # turn isolate tweeters into self loops
+  count <- 0
+  for (i in 1:nrow(df)) {
+    if (is.na(df[i, reply_to_user_id][[1]]) == FALSE ||
+        is.na(df[i, mentions_user_id][[1]]) == FALSE ||
+        df[i, is_quote][[1]] == TRUE ||
+        df[i, is_retweet][[1]] == TRUE
+        ) { next } 
+    
+    count <- count + 1
+    
+    dt_combined[nextEmptyRow, from:= as.character(df$user_id[i][[1]])]
+    dt_combined[nextEmptyRow, to := as.character(df$user_id[i][[1]])]
+    dt_combined[nextEmptyRow, edge_type := as.character("self-loop")]
+    dt_combined[nextEmptyRow, timestamp := as.character(df$created_at[i][[1]])]
+    dt_combined[nextEmptyRow, status_id := as.character(df$status_id[i][[1]])]
+    
+    df_users <- rbind(df_users, list(df$user_id[i][[1]], df$screen_name[i][[1]]))
+    
+    nextEmptyRow <- nextEmptyRow + 1 # increment the row to update in dt_combined
+  }
+  df_stats <- networkStats(df_stats, "self-loops", count, TRUE)
+  
   dt_combined <- dt_combined[edge_type != "NA_f00"]
   
   # make a vector of all the unique actors in the network
@@ -195,24 +218,13 @@ Create.actor.twitter <- function(datasource, type, writeToFile = FALSE, verbose 
     timestamp = dt_combined$timestamp,
     status_id = dt_combined$status_id)
   
-  g <- graph_from_data_frame(df_relations, directed = TRUE, vertices = df_users)
-  
-  V(g)$screen_name <- ifelse(is.na(V(g)$screen_name), paste0("ID:", V(g)$name), V(g)$screen_name)
-  V(g)$label <- V(g)$screen_name
-  g <- set_graph_attr(g, "type", "twitter")
-  
-  if (writeToFile) { writeOutputFile(g, "graphml", "TwitterActorNetwork") }
-  
-  cat("Done.\n")
-  flush.console()
-  
   func_output <- list(
-    "relations" = df_relations,
-    "users" = df_users,
-    "graph" = g
+    "edges" = tibble::as_tibble(df_relations),
+    "nodes" = tibble::as_tibble(df_users)
   )
   
-  class(func_output) <- append(class(func_output), c("network", "actor", "twitter"))
+  class(func_output) <- union(class(func_output), c("network", "actor", "twitter"))
+  cat("Done.\n")
   
-  return(func_output)
+  func_output
 }

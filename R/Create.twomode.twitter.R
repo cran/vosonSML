@@ -1,52 +1,48 @@
-#' @title Create twitter bimodal network
+#' @title Create twitter twomode network
 #' 
-#' @description Creates a bimodal network from tweets returned from the twitter search query. In this network there are 
+#' @description Creates a twomode network from tweets returned from the twitter search query. In this network there are 
 #' two types of nodes, twitter users who have tweeted (actors) and hashtags found within their tweets. Network edges 
 #' are weighted and represent hashtag usage by the actor or specifically their tweets that contain a hashtag matching 
 #' the name of the node they are directed towards.
 #'
 #' @param datasource Collected social media data with \code{"datasource"} and \code{"twitter"} class names.
-#' @param type Character string. Type of network to be created, set to \code{"bimodal"}.
-#' @param removeTermsOrHashtags Character vector. Terms or hashtags to remove from the bimodal network. For example, 
+#' @param type Character string. Type of network to be created, set to \code{"twomode"}.
+#' @param removeTermsOrHashtags Character vector. Terms or hashtags to remove from the twomode network. For example, 
 #' this parameter could be used to remove the search term or hashtag that was used to collect the data by removing any
 #' nodes with matching name. Default is \code{NULL} to remove none.
-#' @param writeToFile Logical. Save network data to a file in the current working directory. Default is \code{FALSE}.
 #' @param verbose Logical. Output additional information about the network creation. Default is \code{FALSE}.
 #' @param ... Additional parameters passed to function. Not used in this method.
 #' 
-#' @return Named list containing bimodal network as igraph object \code{$graph}.
+#' @return Network as a named list of two dataframes containing \code{$nodes} and \code{$edges}.
 #' 
 #' @examples
 #' \dontrun{
-#' # create a twitter bimodal network graph removing the hashtag '#auspol' as it was used in 
+#' # create a twitter twomode network graph removing the hashtag '#auspol' as it was used in 
 #' # the twitter search query
-#' bimodalNetwork <- twitterData %>% 
-#'                   Create("bimodal", removeTermsOrHashtags = c("#auspol"), writeToFile = TRUE, 
-#'                          verbose = TRUE)
+#' twomodeNetwork <- twitterData %>% 
+#'                   Create("twomode", removeTermsOrHashtags = c("#auspol"), verbose = TRUE)
 #' 
-#' # igraph object
-#' # bimodalNetwork$graph
+#' # network
+#' # twomodeNetwork$nodes
+#' # twomodeNetwork$edges
 #' }
 #' 
 #' @export
-Create.bimodal.twitter <- function(datasource, type, removeTermsOrHashtags = NULL, writeToFile = FALSE, 
-                                   verbose = FALSE, ...) {
-  
+Create.twomode.twitter <- function(datasource, type, removeTermsOrHashtags = NULL, verbose = FALSE, ...) {
+  cat("Generating twitter twomode network...")
+  if (verbose) { cat("\n") }
+
   from <- to <- edge_type <- timestamp <- status_id <- NULL
 
-  if (is.null(removeTermsOrHashtags)) {
-    removeTermsOrHashtags <- "#fake_hashtag_foobar42_1234567890"
-  } else {
+  if (!is.null(removeTermsOrHashtags) && length(removeTermsOrHashtags)) {
     removeTermsOrHashtags <- as.vector(removeTermsOrHashtags) # coerce to vector to be sure
+    removeTermsOrHashtags <- unlist(lapply(removeTermsOrHashtags, tolower))
   }
   
   df <- datasource
   df <- data.table(df)
 
   df_stats <- networkStats(NULL, "collected tweets", nrow(df))
-
-  cat("Generating twitter bimodal network...\n")
-  flush.console()
 
   df_entities <- data.table("entity_id" = character(0), "display_name" = character(0))
 
@@ -78,7 +74,7 @@ Create.bimodal.twitter <- function(datasource, type, removeTermsOrHashtags = NUL
       
       for (j in 1:length(df$hashtags[[i]])) { # for each hashtag in list
         
-        tag <- paste0("#", df$hashtags[[i]][j])
+        tag <- paste0("#", tolower(df$hashtags[[i]][j]))
         
         dt_combined[nextEmptyRow, from:= as.character(df$user_id[i][[1]])]
         dt_combined[nextEmptyRow, to := as.character(tag)]
@@ -114,31 +110,27 @@ Create.bimodal.twitter <- function(datasource, type, removeTermsOrHashtags = NUL
     timestamp = dt_combined$timestamp,
     status_id = dt_combined$status_id)
   
-  g <- graph_from_data_frame(relations, directed = TRUE, vertices = df_entities)
-  
-  V(g)$display_name <- ifelse(is.na(V(g)$display_name), paste0("ID:", V(g)$name), V(g)$display_name)
-  
   # remove the search term / hashtags, if user specified it:
-  if (removeTermsOrHashtags[1] != "#fake_hashtag_foobar42_1234567890") {
-    # we force to lowercase because all terms/hashtags are already converted to lowercase
-    toDel <- match(tolower(removeTermsOrHashtags), V(g)$name)
-    # in case of user error (i.e. trying to delete terms/hashtags that don't exist in the data)
-    toDel <- toDel[!is.na(toDel)]
-    g <- delete.vertices(g, toDel)
+  if (length(removeTermsOrHashtags)) {
+    # remove hashtags
+    relations %<>% dplyr::filter((!.data$to %in% removeTermsOrHashtags) &
+                                 (!.data$from %in% removeTermsOrHashtags))
+    df_entities %<>% dplyr::filter(!.data$entity_id %in% removeTermsOrHashtags)
+    
+    # # we force to lowercase because all terms/hashtags are already converted to lowercase
+    # toDel <- match(tolower(removeTermsOrHashtags), V(g)$name)
+    # # in case of user error (i.e. trying to delete terms/hashtags that don't exist in the data)
+    # toDel <- toDel[!is.na(toDel)]
+    # g <- delete.vertices(g, toDel)
   }
   
-  V(g)$label <- V(g)$display_name
-  
-  if (writeToFile) { writeOutputFile(g, "graphml", "TwitterBimodalNetwork") }
-  
-  cat("Done.\n")
-  flush.console()
-  
   func_output <- list(
-    "graph" = g
+    "nodes" = tibble::as_tibble(df_entities),
+    "edges" = tibble::as_tibble(relations)
   )
   
-  class(func_output) <- append(class(func_output), c("network", "bimodal", "twitter"))
+  class(func_output) <- union(class(func_output), c("network", "twomode", "twitter"))
+  cat("Done.\n")
   
-  return(func_output)
+  func_output
 }

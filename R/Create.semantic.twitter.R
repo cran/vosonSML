@@ -18,11 +18,10 @@
 #' @param hashtagFreq Numeric integer. Specifies the percentage of most frequent \code{hashtags} to include. For 
 #' example, a \code{hashtagFreq = 80} means that the 80 percent most frequently occurring hashtags will be included 
 #' in the semantic network as nodes. The default value is \code{50}.
-#' @param writeToFile Logical. Save network data to a file in the current working directory. Default is \code{FALSE}.
 #' @param verbose Logical. Output additional information about the network creation. Default is \code{FALSE}.
 #' @param ... Additional parameters passed to function. Not used in this method.
 #' 
-#' @return Named list containing semantic network as igraph object \code{$graph}.
+#' @return Network as a named list of two dataframes containing \code{$nodes} and \code{$edges}.
 #' 
 #' @examples
 #' \dontrun{
@@ -31,27 +30,31 @@
 #' # concepts or nodes
 #' semanticNetwork <- twitterData %>% 
 #'                    Create("semantic", removeTermsOrHashtags = c("#auspol"), termFreq = 2,
-#'                           hashtagFreq = 10, writeToFile = TRUE, verbose = TRUE)
+#'                           hashtagFreq = 10, verbose = TRUE)
 #' 
-#' # igraph object
-#' # semanticNetwork$graph
+#' # network
+#' # semanticNetwork$nodes
+#' # semanticNetwork$edges
 #' }
 #' 
 #' @export
 Create.semantic.twitter <- function(datasource, type, removeTermsOrHashtags = NULL, stopwordsEnglish = TRUE, 
-                                    termFreq = 5, hashtagFreq = 50, writeToFile = FALSE, verbose = FALSE, ...) {
+                                    termFreq = 5, hashtagFreq = 50, verbose = FALSE, ...) {
 
+  cat("Generating twitter semantic network...")
+  if (verbose) { cat("\n") }
+  
   # default to the top 5% most frequent terms. reduces size of graph
   # default to the top 50% hashtags. reduces size of graph. hashtags are 50% because they are much less 
   # frequent than terms.
 
-  if (is.null(removeTermsOrHashtags)) {
-    removeTermsOrHashtags <- "foobar"
-  } else {
+  if (!is.null(removeTermsOrHashtags) && length(removeTermsOrHashtags)) {
     removeTermsOrHashtags <- as.vector(removeTermsOrHashtags) # coerce to vector
+    removeTermsOrHashtags <- unlist(lapply(removeTermsOrHashtags, tolower))
   }
   
   df <- datasource # match the variable names (this must be used to avoid warnings in package compilation)
+  # df <- tibble::as_tibble(datasource)
   
   # if df is a list of dataframes, then need to convert these into one dataframe
   suppressWarnings(
@@ -63,9 +66,6 @@ Create.semantic.twitter <- function(datasource, type, removeTermsOrHashtags = NU
   # both occurred in same tweet (weight = n occurrences))
   
   df_stats <- networkStats(NULL, "collected tweets", nrow(df))
-  
-  cat("Generating twitter semantic network...\n")
-  flush.console()
   
   # added hash to hashtags to identify and merge them in results
   df$hashtags <- lapply(df$hashtags, function(x) ifelse(is.na(x), NA, paste0("#", x)))
@@ -82,6 +82,8 @@ Create.semantic.twitter <- function(datasource, type, removeTermsOrHashtags = NU
   # and then convert to lowercase
   df$text <- tolower(df$text)
   df$hashtags <- lapply(df$hashtags, tolower)
+  
+  # test - remove terms at this point?
   
   # macMatch <- grep("darwin", R.Version()$os)
   # if (length(macMatch) != 0) {
@@ -152,7 +154,7 @@ Create.semantic.twitter <- function(datasource, type, removeTermsOrHashtags = NU
   # this is a decision point for non-english text
   # df$text <- gsub("[^[:alnum:][:space:]#]", "", df$text)
   
-  # remove urls so dont get weird strings after punctuation removal
+  # remove twitter shortened urls so dont get weird strings after punctuation removal
   df$text <- gsub("https://t.co/[a-zA-Z0-9]+\\s", "", df$text, ignore.case = TRUE, perl = TRUE)
   
   # remove punctuation except # and @
@@ -175,7 +177,12 @@ Create.semantic.twitter <- function(datasource, type, removeTermsOrHashtags = NU
 
   # we remove the usernames from the text (so they don't appear in data/network)
   my_stopwords <- mach_usernames
-  # corpusTweetText <- suppressWarnings(tm_map(corpusTweetText, removeWords, my_stopwords))
+  corpusTweetText <- suppressWarnings(tm_map(corpusTweetText, removeWords, my_stopwords))
+  
+  # remove terms
+  # if (removeTermsOrHashtags[1] != "foobar") {
+  #   corpusTweetText <- suppressWarnings(tm_map(corpusTweetText, removeWords, removeTermsOrHashtags))
+  # }
   
   # convert to all lowercase (WE WILL DO THIS AGAIN BELOW, SO REMOVE THIS DUPLICATE)
   # corpusTweetText <- tm_map(corpusTweetText, content_transformer(tolower))
@@ -262,47 +269,42 @@ Create.semantic.twitter <- function(datasource, type, removeTermsOrHashtags = NU
   relations$to <- as.factor(relations$to)
   
   actorsFixed <- rbind(as.character(unique_dfSemanticNetwork3[, 1]), as.character(unique_dfSemanticNetwork3[, 2]))
-  actorsFixed <- as.factor(actorsFixed)
-  actorsFixed <- unique(actorsFixed)
+  actorsFixed <- unique(as.factor(actorsFixed))
+
   df_stats <- networkStats(df_stats, "unique entities (nodes)", length(actorsFixed))
   df_stats <- networkStats(df_stats, "relations (edges)", nrow(relations))
   
-  # convert into a graph
-  suppressWarnings(g <- graph_from_data_frame(relations, directed = FALSE, vertices = actorsFixed))
-  
-  # we need to simplify the graph because multiple use of same term in one tweet will cause self-loops, etc
-  # g <- simplify(g)
-  
-  # make the node labels play nice with Gephi
-  V(g)$label <- V(g)$name
+  relations <- tibble::as_tibble(relations)
+  actorsFixed <- tibble::as_tibble(actorsFixed)
   
   # remove the search term / hashtags, if user specified it
-  if (removeTermsOrHashtags[1] != "foobar") {
-    # we force to lowercase because all terms/hashtags are already converted to lowercase
-    toDel <- match(tolower(removeTermsOrHashtags), V(g)$name)
+  if (length(removeTermsOrHashtags)) {
+    # this should take place before freq % calculations
+    relations %<>% dplyr::filter((!.data$to %in% removeTermsOrHashtags) &
+                                 (!.data$from %in% removeTermsOrHashtags))
+    actorsFixed %<>% dplyr::filter(!.data$value %in% removeTermsOrHashtags)
     
-    # in case of user error (i.e. trying to delete terms/hashtags that don't exist in the data)
-    toDel <- toDel[!is.na(toDel)]
+    df_stats <- networkStats(df_stats, "entities after terms/hashtags removed", nrow(actorsFixed))
     
-    g <- delete.vertices(g, toDel)
-    
-    df_stats <- networkStats(df_stats, "entities after terms/hashtags removed", vcount(g))
+    # # we force to lowercase because all terms/hashtags are already converted to lowercase
+    # toDel <- match(tolower(removeTermsOrHashtags), V(g)$name)
+    # 
+    # # in case of user error (i.e. trying to delete terms/hashtags that don't exist in the data)
+    # toDel <- toDel[!is.na(toDel)]
+    # g <- delete.vertices(g, toDel)
+    # df_stats <- networkStats(df_stats, "entities after terms/hashtags removed", vcount(g))
   }
   
   # print stats
   if (verbose) { networkStats(df_stats, print = TRUE) }
   
-  if (writeToFile) { writeOutputFile(g, "graphml", "TwitterSemanticNetwork") }
-  
-  cat("Done.\n")
-  flush.console()
-  
   func_output <- list(
-    "relations" = relations,
-    "graph" = g
+    "nodes" = actorsFixed,
+    "edges" = relations
   )
   
-  class(func_output) <- append(class(func_output), c("network", "semantic", "twitter"))
+  class(func_output) <- union(class(func_output), c("network", "semantic", "twitter"))
+  cat("Done.\n")
   
-  return(func_output)
+  func_output
 }
