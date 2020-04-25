@@ -1,8 +1,64 @@
+# vosonSML 0.29.10
+
+## Minor Changes
+- Reimplemented the `Create.semantic.twitter` and `Create.twomode.twitter` functions using the `tidytext` package. They now better support tokenization of tweet text and allows a range of stopword lists and sources to be used from the `stopwords` package. The semantic network function requires the `tidytext` and `tidyr` packages to be installed before use.
+- New parameters have been added to `Create.semantic.twitter`: 
+    - Numbers and urls can be removed or included from the term list using `removeNumbers` and `removeUrls`, default value is `TRUE`.
+    - The `assoc` parameter has been added to choose which node associations or ties to include in the network. The default value is `"limited"` and includes only ties between most frequently occurring hashtags and terms in tweets. A value of `full` will also include ties between most frequently occurring hashtags and hashtags, and terms with terms creating a more densely connected network.
+    - Parameters to specify `stopwords` language e.g `stopwordsLang = "en"` and source e.g `stopwordsSrc = "smart"` have been added. These correspond to the `language` and `source` parameters of the `tidytext::get_stopwords` function. The `stopwords` default value is `TRUE`.
+- The network produced by the `Create.twomode.twitter` function is weighted by default but can be disabled by setting the new `weighted` parameter to `FALSE`.
+- Renamed the `replies_from_text` parameter to `repliesFromText` and `at_replies_only` to `atRepliesOnly` in the `AddText.actor.youtube` function for consistency.
+- Improved the usage examples in the README file.
+- Removed `tm` package dependency.
+
+# vosonSML 0.29.9
+
+## Minor Changes
+- Updated `Introduction to vosonSML` vignette `Merging Collected Data` examples.
+- Added new hex sticker to package documentation.
+
+## Bug Fixes
+- Fixed a logic problem in `Collect.youtube` that was causing no video comments to be collected if there were no reply comments for any of the videos first `maxComments` number of top level comments. For example, if `maxComments` is set to 100 and the first 100 comments made to a video had no replies then no results would be returned. 
+
+# vosonSML 0.29.8
+
+## Bug Fixes
+- A recent intermittent problem with the Twitter API caused an issue with the `rtweet::rate_limit` function that resulted in an error when using the rtweet `retryonratelimit` search parameter. The `rate_limit` function was being called by `vosonSML` to check the twitter rate limit regardless of whether the search parameter was set or not, and so was failing `Collect` with an error. A fix was made so that `vosonSML` checks if `rtweet::rate_limit` succeeds, and if not automatically sets `retryonratelimit` to `FALSE` so that a twitter `Collect` can still be performed without error should this problem occur again.
+
+## Minor Changes
+- Added some links to the `pkgdown` site navbar.
+
+# vosonSML 0.29.7
+
+## Minor Changes
+- Added some guidance for merging collected data to the `Introduction to vosonSML` vignette. 
+
+# vosonSML 0.29.6
+
+## Minor Changes
+- Added `Introduction to vosonSML` vignette to the package.
+- Minor changes and input checks added to `ImportData`.
+- Added some unit testing for `Authenticate` and `ImportData`.
+
+# vosonSML 0.29.5
+
+## Minor Changes
+- Reddit JSON is now retrieved using `jsonlite::fromJSON`.
+- Reddit 'Continue' threads are now followed with additional thread requests. Many more comments
+  are now collected for threads with large diameters or breadth. Continue threads also have a
+  Reddit limit of 500 comments per thread request.
+- Reddit comment ID's and timestamps are now extracted.
+- Removed the `tictoc` package from dependency imports to suggested packages.
+- Added some checks for whether the `rtweet` package is installed.
+- Removed the `RedditExtractoR` package from imports.
+- HTML decoded tweet text during network creation to replace '&', '<', and '>' HTML codes.
+- Added node type attribute to `twomode` networks.
+
 # vosonSML 0.29.4
 
 ## Minor Changes
 - Renamed `bimodal` networks to `twomode`.
-  
+
 # vosonSML 0.29.3
 
 ## Minor Changes
@@ -36,7 +92,7 @@
   the videos in the network is required. Additional columns such as video `Title`, `Description` and
   `Published` time are also added to the network `$edges` dataframe as well as returned in their own
   dataframe called `$videos`.
-  
+
 # vosonSML 0.29.0
 
 ## Major Changes
@@ -64,7 +120,7 @@
 - Added `activity` network type for reddit. In the reddit activity network nodes are the
   thread posts and comments, edges represent where comments are directed in the threads.
 - Added github dev version badge to README.
-  
+
 # vosonSML 0.28.0
 
 ## Major Changes
@@ -72,7 +128,7 @@
   nodes are the items collected such as tweets returned from a twitter search and comments
   posted to youtube videos. Edges represent the platform relationship between the tweets or
   comments.
-  
+
 # vosonSML 0.27.3
 
 ## Minor Changes
@@ -93,7 +149,7 @@
   temporarily set to package name and current version number for Collect e.g
   `vosonSML v.0.27.2 (R Package)`.
 - Removed hex sticker (and favicons for pkgdown site).
-  
+
 # vosonSML 0.27.1
 
 ## Bug Fixes
@@ -123,14 +179,14 @@
   more permissive. Addresses encoding issues with apostrophes and pound symbols and removes
   unicode characters not permitted by the XML 1.0 standard as used in `graphml` files. This is
   best effort and does not resolve all `reddit` text encoding issues.
-  
+
 ## Minor Changes
 - Added `Collect.twitter` summary information that includes the earliest (min) and latest (max)
   tweet `status_id` collected with timestamp. The `status_id` values can be used to frame
   subsequent collections as `since_id` or `max_id` parameter values. If the `until` date
   parameter was used the timestamp can also be used as a quick confirmation.
 - Added elapsed time output to the `Collect` method.
-  
+
 # vosonSML 0.26.3
 
 ## Bug Fixes
@@ -149,12 +205,12 @@
 - Fixed a bug in `Create.actor.twitter` and `Create.bimodal.twitter` in which the vertices
   dataframe provided to the `graph_from_data_frame` function as a contained duplicate names
   raising an error.
-  
+
 ## Major Changes
 - Revised and updated `roxygen` documentation and examples for all package functions.
 - Updated all `Authenticate`, `Collect` and `Create` S3 methods to implement function routing
   based on object class names.
-  
+
 ## Minor Changes
 - Created a `pkgdown` web site for github hosted package documentation.
 - Created a new hex sticker logo.

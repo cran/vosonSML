@@ -14,8 +14,10 @@ Graph <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
   cat("Creating igraph network graph...")
   if (writeToFile) { cat("\n") }
   
-  # create igraph object from dataframes
-  g <- igraph::graph_from_data_frame(d = net$edges, directed = directed, vertices = net$nodes)
+  if (!all(c("semantic", "twitter") %in% class(net))) {
+    # create igraph object from dataframes
+    g <- igraph::graph_from_data_frame(d = net$edges, directed = directed, vertices = net$nodes)
+  }
   
   # searches the class list of net for matching method
   UseMethod("Graph", net)
@@ -71,7 +73,11 @@ Graph.activity.youtube <- function(net, directed = TRUE, writeToFile = FALSE, ..
 #' @noRd
 #' @export
 Graph.activity.reddit <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
-  V(g)$label <- ifelse(!is.na(V(g)$user), paste0(V(g)$name, " (", V(g)$user, ")"), V(g)$name)
+  # V(g)$label <- ifelse(!is.na(V(g)$user), paste0(V(g)$name, " (", V(g)$user, ")"), V(g)$name)
+  V(g)$label <- paste0(V(g)$thread_id, 
+                       ifelse(!is.na(V(g)$comm_id), paste0(".", V(g)$comm_id), ""),
+                       ifelse(!is.na(V(g)$user), paste0(" (", V(g)$user, ")"), ""))
+  
   g <- set_graph_attr(g, "type", "reddit")
 
   graphOutputFile(g, "graphml", writeToFile, "RedditActivity")
@@ -123,8 +129,8 @@ Graph.actor.youtube <- function(net, directed = TRUE, writeToFile = FALSE, ...) 
 #' @export
 Graph.actor.reddit <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
   V(g)$label <- ifelse(is.na(V(g)$user), paste0("ID:", V(g)$name), 
-                             paste0(V(g)$user, " (", V(g)$name, ")"))
-
+                       paste0(V(g)$user, " (", V(g)$name, ")"))
+  
   g <- set_graph_attr(g, "type", "reddit")
   
   graphOutputFile(g, "graphml", writeToFile, "RedditActor")
@@ -136,7 +142,7 @@ Graph.actor.reddit <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
 #' @noRd
 #' @method Graph semantic
 #' @export
-Graph.semantic <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
+Graph.semantic <- function(net, directed = FALSE, writeToFile = FALSE, ...) {
   UseMethod("Graph.semantic", net)
 }
 
@@ -148,9 +154,10 @@ Graph.semantic.default <- function(...) {
 
 #' @noRd
 #' @export
-Graph.semantic.twitter <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
-  # we need to simplify the graph because multiple use of same term in one tweet will cause self-loops, etc
-  # g <- simplify(g)  
+Graph.semantic.twitter <- function(net, directed = FALSE, writeToFile = FALSE, ...) {
+  # create igraph object from dataframes
+  g <- igraph::graph_from_data_frame(d = net$edges, directed = directed, vertices = net$nodes)
+  
   V(g)$label <- V(g)$name
   g <- set_graph_attr(g, "type", "twitter")
   
@@ -176,8 +183,8 @@ Graph.twomode.default <- function(...) {
 #' @noRd
 #' @export
 Graph.twomode.twitter <- function(net, directed = TRUE, writeToFile = FALSE, ...) {
-  V(g)$label <- ifelse(V(g)$name == V(g)$display_name, V(g)$display_name,
-                       paste0("@", V(g)$display_name, " (", V(g)$name, ")"))
+  # V(g)$label <- ifelse(is.na(V(g)$user_id), V(g)$name, paste0(V(g)$name, " (", V(g)$user_id, ")"))
+  V(g)$label <- V(g)$name
   
   g <- set_graph_attr(g, "type", "twitter")
   
