@@ -1,9 +1,12 @@
-#' @title Create twitter twomode network
+#' @title Create twitter 2-mode network
 #' 
-#' @description Creates a twomode network from tweets returned from the twitter search query. In this network there are 
+#' @description Creates a 2-mode network from tweets returned from the twitter search query. In this network there are 
 #' two types of nodes, twitter users who authored or were mentioned in collected tweets and hashtags found within
 #' tweets. Network edges represent a users tweets that contain hashtags or mention users screen names.
 #'
+#' The creation of twitter 2-mode networks requires text processing and the tokenization of tweets. As such
+#' this function requires the additional installation of the \pkg{tidytext} package to achieve this.
+#' 
 #' @param datasource Collected social media data with \code{"datasource"} and \code{"twitter"} class names.
 #' @param type Character string. Type of network to be created, set to \code{"twomode"}.
 #' @param removeTermsOrHashtags Character vector. Users or hashtags to remove from the twomode network. For example, 
@@ -18,7 +21,11 @@
 #' 
 #' @examples
 #' \dontrun{
-#' # create a twitter twomode network graph removing the hashtag '#auspol' as it was used in 
+#' # twitter 2-mode network creation additionally requires the tidytext package
+#' # for working with text data
+#' install.packages("tidytext")
+#' 
+#' # create a twitter 2-mode network graph removing the hashtag '#auspol' as it was used in 
 #' # the twitter search query
 #' twomodeNetwork <- twitterData %>% 
 #'                   Create("twomode", removeTermsOrHashtags = c("#auspol"), verbose = TRUE)
@@ -31,7 +38,7 @@
 #' @export
 Create.twomode.twitter <- function(datasource, type, removeTermsOrHashtags = NULL, weighted = TRUE, 
                                    verbose = FALSE, ...) {
-  cat("Generating twitter twomode network...")
+  cat("Generating twitter 2-mode network...")
   if (verbose) { cat("\n") }
 
   if (!requireNamespace("tidytext", quietly = TRUE)) {
@@ -40,6 +47,9 @@ Create.twomode.twitter <- function(datasource, type, removeTermsOrHashtags = NUL
 
   if (verbose) { df_stats <- networkStats(NULL, "collected tweets", nrow(datasource)) }
  
+  # datasource <- tibble::as_tibble(datasource)
+  class(datasource) <- rmCustCls(class(datasource))
+  
   datasource <- datasource %>% dplyr::select(.data$status_id, .data$user_id, .data$screen_name,
                                              .data$text, .data$created_at, .data$is_retweet,
                                              .data$is_quote)
@@ -99,7 +109,7 @@ Create.twomode.twitter <- function(datasource, type, removeTermsOrHashtags = NUL
     "edges" = edges
   )
   
-  class(func_output) <- union(class(func_output), c("network", "twomode", "twitter"))
+  class(func_output) <- append(class(func_output), c("network", "twomode", "twitter"))
   cat("Done.\n")
   
   func_output

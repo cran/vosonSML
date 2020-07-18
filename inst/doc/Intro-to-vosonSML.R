@@ -168,6 +168,9 @@
 #  dev.off()
 
 ## ----eval=FALSE---------------------------------------------------------------
+#  # additional required packages
+#  install.packages("tidytext")
+#  
 #  twomodeNetwork <- twitterData %>% Create("twomode", removeTermsOrHashtags = c("#auspol"))
 #  twomodeGraph <- twomodeNetwork %>% Graph(writeToFile = TRUE)
 
@@ -221,6 +224,9 @@
 #  dev.off()
 
 ## ----eval=FALSE---------------------------------------------------------------
+#  # additional required packages
+#  install.packages(c("tidyr", "tidytext", "stopwords"))
+#  
 #  semanticNetwork <- twitterData %>% Create("semantic",
 #                                            removeTermsOrHashtags = c("#auspol", "auspol", "australia"),
 #                                            termFreq = 5)

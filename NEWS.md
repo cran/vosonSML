@@ -1,3 +1,24 @@
+# vosonSML 0.29.13
+
+## Minor Changes
+- Minor documentation updates to `Create.semantic.twitter`, `Create.twomode.twitter` and the `Intro-to-vosonSML` vignette:
+    - Specified the `tidyr`, `tidytext` and `stopwords` package requirements in descriptions and examples
+    - Updated references to `twomode` networks as `2-mode` where possible
+
+# vosonSML 0.29.12
+
+## Bug Fixes
+- Fixed an issue with custom classes assigned to dataframes causing an `vctrs` error when using `dplyr` functions. The classes are no longer needed post-method routing so they are simply removed.
+- Replaced an instance of the deprecated `dplyr::funs` function that was generating a warning.
+
+## Minor Changes
+- Minor documentation updates.
+
+# vosonSML 0.29.11
+
+## Bug Fixes
+- Fixed a reddit collect `bind_rows` error on joining dataframes with different types for the structure column. Column type was being set to integer instead of character in cases when every thread comment have no replies or depth (except the OP).
+
 # vosonSML 0.29.10
 
 ## Minor Changes
