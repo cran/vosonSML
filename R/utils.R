@@ -1,31 +1,50 @@
 # package version
 get_version <- function() {
-  if ("vosonSML" %in% loadedNamespaces()) {
-    return(utils::packageVersion("vosonSML"))
-  }
+  if ("vosonSML" %in% loadedNamespaces()) return(utils::packageVersion("vosonSML"))
   "_"
 }
 
+# get package ua
+vsml_ua <- function() {
+  gum("vosonSML v{get_version()}",
+      " (R{as.character(R.version['major'])}.{as.character(R.version['minor'])};",
+      "{as.character(R.version['platform'])})")
+}
+
+# save collect opts
+get_env_opts <- function() {
+  opts <- list(
+    enc = getOption("encoding"),
+    ua = getOption("HTTPUserAgent"),
+    tz = Sys.timezone()
+  )
+}
+
+# set collect opts
+set_collect_opts <- function(opts = NULL) {
+  if (is.null(opts)) {
+    options(encoding = "UTF-8")
+    options(HTTPUserAgent = vsml_ua())
+    Sys.setenv(TZ = "Etc/UTC")
+  } else {
+    options(encoding = opts$enc)
+    options(HTTPUserAgent = opts$ua)
+    Sys.setenv(TZ = opts$tz)
+  }
+  invisible()
+}
+
 # return a file name with system time prefix
-sys_time_filename <-
-  function(name_suffix,
-           name_ext,
-           current_time = NULL,
-           clean = FALSE) {
-    if (is.null(current_time)) {
-      current_time <- Sys.time()
-    }
+sys_time_filename <- function(name_suffix, name_ext, current_time = NULL, clean = FALSE) {
+    
+    if (is.null(current_time)) current_time <- Sys.time()
 
     if (clean) {
       name_suffix <- stringr::str_replace_all(name_suffix, "[\\s:]", "_")
       name_ext <- stringr::str_remove_all(name_ext, "[\\s:\\.]")
     }
 
-    paste0(format(current_time, "%Y-%m-%d_%H%M%S"),
-           "-",
-           name_suffix,
-           ".",
-           name_ext)
+    paste0(format(current_time, "%Y-%m-%d_%H%M%S"), "-", name_suffix, ".", name_ext)
   }
 
 data_path <- function(x = getOption("voson.data")) {
@@ -35,9 +54,17 @@ data_path <- function(x = getOption("voson.data")) {
   path <- sub("(\\/)+$", "", path)
   path <- paste0(path, "/")
 
+  if (!dir.exists(path)) dir.create(path, showWarnings = TRUE)
   if (dir.exists(path)) return(path)
-
+  
   NULL
+}
+
+# check writeToFile option
+write_opt <- function(opt = "voson.save", default = FALSE) {
+  opt_save <- getOption(opt)
+  if (!is.na(opt_save) && is.logical(opt_save)) return(opt_save)
+  default
 }
 
 # write data to file in supported file format
@@ -46,8 +73,8 @@ write_output_file <-
            type = "rds",
            name = "File",
            datetime = TRUE,
-           verbose = FALSE) {
-    msg <- f_verbose(verbose)
+           verbose = FALSE,
+           log = NULL) {
 
     set_path <- function(x) x
     data_path <- data_path()
@@ -66,13 +93,8 @@ write_output_file <-
       return(NULL)
     }
 
-    if (type == "csv") {
-      stop_req_pkgs(c("readr"))
-    }
-
-    if (datetime) {
-      name <- sys_time_filename(name, type)
-    }
+    if (type == "csv") stop_req_pkgs(c("readr"))
+    if (datetime) name <- sys_time_filename(name, type)
 
     path <- name
 
@@ -106,32 +128,27 @@ write_output_file <-
         msg(paste0(set_path(path), "\n"))
       }
     } else {
-      if (verbose) {
-        msg(paste0("File unable to be written.\n"))
-      }
+      if (verbose) msg(paste0("File unable to be written.\n"))
+    }
+    
+    # write a simple log file
+    if (!is.null(log)) {
+      log_path <- paste0(set_path(path), ".txt")
+      tryCatch({
+        con <- file(log_path)
+        writeLines(paste0(log, collapse = "\n"), con)
+        close(con)
+      }, error = function(e) {
+        msg(paste0("Error writing log file.\n", e))
+      })
     }
   }
 
 # get the length of the longest character value in a list
-max_chrlen_in_list <- function(lst) {
-  i <- 0
-  sapply(lst, function(x) {
-    if (nchar(as.character(x)) > i)
-      i <<- nchar(x)
-  })
-  i
-}
+max_chrlen_in_list <- function(x) max(stringr::str_length(x))
 
 # pad a character string with spaces
-pad_to_len <- function(value, to_len) {
-  value_len <- nchar(as.character(value))
-  if (value_len < to_len) {
-    return(paste0(value, paste0(
-      replicate(to_len - value_len, ""), collapse = " "
-    ), " "))
-  }
-  as.character(value)
-}
+pad_to_len <- function(x, to_len) stringr::str_pad(x, to_len, side = "right")
 
 # format and print summary dataframe
 print_summary <- function(df) {
@@ -143,12 +160,11 @@ print_summary <- function(df) {
       ifelse(is.na(x), "-", x)
     })
     temp_len <- max_chrlen_in_list(df[[i]])
-    col_len[i] <-
-      ifelse(temp_len > col_len[i], temp_len, col_len[i])
+    col_len[i] <- ifelse(temp_len > col_len[i], temp_len, col_len[i])
   }
 
-  header <-
-    paste0(sapply(col_names, function(x) {
+  header <- paste0(
+    sapply(col_names, function(x) {
       pad_to_len(x, col_len[match(c(x), col_names)])
     }), collapse = " | ")
 
@@ -160,10 +176,7 @@ print_summary <- function(df) {
     line <- ""
     values <- as.character(as.vector(df[i,]))
     for (j in 1:length(values)) {
-      line <-
-        paste0(line,
-               pad_to_len(values[j], col_len[j]),
-               ifelse(j < length(values), " | ", ""))
+      line <- paste0(line, pad_to_len(values[j], col_len[j]), ifelse(j < length(values), " | ", ""))
     }
     lines <- paste0(lines, line, "\n")
   }
@@ -189,7 +202,7 @@ network_stats <-
           lc <-
             ifelse(nchar(df$count[i]) > lc, nchar(df$count[i]), lc)
         }
-
+        
         for (i in 1:nrow(df)) {
           lfm <- lf
           if (nchar(df$field[i]) != lf) {
@@ -203,10 +216,10 @@ network_stats <-
         }
         out <- paste0(out, "-------------------------\n")
       }
-
+      
       return(out)
     }
-
+    
     if (is.null(df)) {
       df  <-
         tibble::tibble(
@@ -224,11 +237,6 @@ network_stats <-
           stringsAsFactors = FALSE)
   }
 
-# remove collect classes from list
-rm_collect_cls <- function(cls_lst) {
-  cls_lst[!cls_lst %in% c("datasource", "twitter", "youtube", "reddit", "web")]
-}
-
 # check packages and prompt to install if interactive
 # stop if not installed
 prompt_and_stop <- function(pkgs, f) {
@@ -239,10 +247,8 @@ prompt_and_stop <- function(pkgs, f) {
 # check for required packages and stop with a message if missing
 stop_req_pkgs <- function(pkgs, from = "this function") {
   # load the namespace of pkgs loadedNamespaces()
-  req <-
-    sapply(pkgs, function(x) {
-      requireNamespace(x, quietly = TRUE)
-    })
+  req <- sapply(pkgs, function(x) requireNamespace(x, quietly = TRUE))
+  
   if (any(req == FALSE)) {
     stop(
       paste0(
@@ -266,50 +272,72 @@ escape_regex <- function(x) {
 
 ## -- output messaging
 
-# assign message function for verbose output
-f_verbose <- function(x) {
-  opt_msg <- getOption("voson.msg")
+# shorter glue for brevity
+gum <- stringr::str_glue
+gum_data <- stringr::str_glue_data
 
-  opt_f <- vsml_msg
+msg_check_opts <- function(opt = "voson.cat", default = FALSE) {
+  opt_cat <- getOption(opt)
+  if (!is.na(opt_cat) && is.logical(opt_cat)) return(opt_cat)
+  default
+}
 
-  # check if cat option set
-  if (!is.null(opt_msg) && !is.na(opt_msg)) {
-    if (is.logical(opt_msg)) {
-      if (opt_msg == FALSE) {
-        opt_f <- vsml_cat
-      }
-    }
-  }
-
-  f <- vsml_silent
-  if (!is.null(x)) {
-    if (is.logical(x)) {
-      f <- ifelse(x, opt_f, vsml_silent)
-    }
-  }
-  f
+# check voson.cat options
+msg_use_cat <- function() {
+  opt_msg <- msg_check_opts(opt = "voson.msg") # previous opt, is now voson.cat
+  opt_cat <- msg_check_opts(opt = "voson.cat")
+  
+  if (opt_msg == FALSE & opt_cat == TRUE) return(TRUE)
+  FALSE
 }
 
 # base output function
-msg <- function(x) {
-  vsml_msg(x)
+msg <- function(x, ..., .x = "-", .xenvir = parent.frame(), .verbose = NULL) {
+  
+  if (!is.null(.verbose)) {
+    verbose <- .verbose
+  } else {
+    verbose <- .xenvir$verbose
+  }
+
+  # if not verbose only continue if warning or danger
+  if (is.null(verbose) || verbose == FALSE) {
+    if (!.x %in% c("warning", "danger")) return(invisible(x))
+  }
+  
+  # interpolate
+  # x_ <- gum(x, ..., .envir = .xenvir)
+  x_ <- x
+  
+  if (!msg_use_cat()) {
+    vsml_msg(x_, .x, appendLF = FALSE)
+    
+    # if cat output
+  } else {
+    vsml_cat(x_, .x)
+  }
+  
+  invisible(x_)
 }
 
 # message output
-vsml_msg <- function(x) {
-  message(x, appendLF = FALSE)
+vsml_msg <- function(x, .x = "-", ...) {
+  if (.x %in% c("warning", "danger")) {
+    warning(x, call. = FALSE, noBreaks. = TRUE)
+  } else {
+    # appendLF = FALSE
+    message(x, ...)
+  }
+  invisible(x)
 }
 
 # cat output
-vsml_cat <- function(x) {
+vsml_cat <- function(x, .x = "-") {
+  if (.x %in% c("warning", "danger")) x <- paste0("!", .x, ":", x)
   cat(x)
   flush.console()
   Sys.sleep(0.05)
-}
-
-# silent output
-vsml_silent <- function(x) {
-  return()
+  invisible(x)
 }
 
 # check debug parameter
@@ -328,9 +356,7 @@ lgl_debug <- function(x) {
 check_lgl <- function(x, param = "value") {
   if (!is.null(x)) {
     if (!is.na(x)) {
-      if (is.logical(x)) {
-        return(x)
-      }
+      if (is.logical(x)) return(x)
     }
   }
 
@@ -343,29 +369,54 @@ check_num <-
            param = "value",
            double = FALSE,
            null.ok = FALSE,
-           na.ok = FALSE) {
+           na.ok = FALSE,
+           inf.ok = FALSE,
+           gte = NULL) {
 
-    if (all(!is.null(x))) {
-      if (all(!is.na(x))) {
-        if (all(is.numeric(x))) {
-          if (!all.equal(x, as.integer(x))) {
-            if (double) {
-              return(x)
-            } else {
-              stop(paste0(param, " must not be a double type."), call. = FALSE)
-            }
-          }
-
-          return(x)
-        }
-      } else {
-        if (na.ok) return(x)
+    if (null.ok == FALSE) {
+      if (any(is.null(x))) {
+        stop(paste0(param, " must be numeric with no NULL values."), call. = FALSE)
       }
-    } else {
-      if (null.ok) return(x)
+    }
+    
+    y <- x[!sapply(x, is.null)]
+    if (length(y) < 1) return(x)
+
+    if (na.ok == FALSE) {
+      if (any(is.na(y))) {
+        stop(paste0(param, " must be numeric with no NA values."), call. = FALSE)
+      }
+    }
+    
+    z <- y[!sapply(y, is.na)]
+    if (length(z) < 1) return(x)
+    
+    if (any(!is.numeric(z))) {
+      stop(paste0(param, " must be numeric."), call. = FALSE)
+    }
+    
+    if (inf.ok == FALSE) {
+      if (any(is.infinite(z))) {
+        stop(paste0(param, " must be numeric with no Inf values."), call. = FALSE)
+      }
     }
 
-    stop(paste0(param, " must be numeric."), call. = FALSE)
+    zz <- z[!sapply(z, is.infinite)]
+    if (length(zz) < 1) return(x)
+    
+    if (double == FALSE) {
+      if (!all.equal(zz, as.integer(zz))) {
+        stop(paste0(param, " must be numeric with no double type."), call. = FALSE)
+      }
+    }
+    
+    if (!is.null(gte)) {
+      if (any(zz < gte)) {
+        stop(paste0(param, " must be greater than or equal to ", gte, "."), call. = FALSE)
+      }
+    }
+    
+    x
   }
 
 # check percentage
@@ -379,18 +430,30 @@ check_perc <- function(x, param = "value") {
   stop(paste0(param, " must be a number between 0 and 100."), call. = FALSE)
 }
 
-# extract value from dots parameter
+# extract a value from dots parameter
 check_dots <- function(x, ...) {
   as.list(match.call(expand.dots = TRUE))[[x]]
 }
 
 # check is dataframe and n rows
 check_df_n <- function(x) {
-  if (!inherits(x, "data.frame")) {
-    return(-1)
-  }
+  if (!inherits(x, "data.frame")) return(-1)
 
   nrow(x)
+}
+
+# compare values
+cmp_values <- function(x, y, param = "value", n = NULL, lc = TRUE) {
+  if (!is.null(n)) {
+    if (!is.vector(x) || !length(x) %in% c(1, n)) {
+      stop(paste0("Please provide a ", param, " value that is length 1 or ", n, "."), call. = FALSE)
+    }
+  }
+  
+  if (lc) x <- tolower(x)
+  if (!all(x %in% y)) {
+    stop(paste0("Please provide ", param, " values in ", paste0(y, collapse = ", "), "."), call. = FALSE)
+  }
 }
 
 # check character input
@@ -442,96 +505,6 @@ check_chr <-
     stop(paste0(param, " must be of character type."), call. = FALSE)
   }
 
-# prototype mask vector of character strings
-# rx_match = ^@ for twitter users
-mask_chr <- function(x,
-                     rx.match = ".",
-                     len.max = NULL,
-                     preserve = 3,
-                     block = NULL,
-                     shuffle = TRUE,
-                     x.upper = NULL,
-                     x.lower = NULL,
-                     x.digit = NULL) {
-
-  if (!is.null(len.max)) x <- stringr::str_sub(x, end = len.max)
-
-  # shuffle chrs
-  shuffle_ <- function(y, m, p) {
-    # ifelse(
-    #   stringr::str_detect(y, m),
-    #   paste0(
-    #     stringr::str_sub(y, 1, p),
-    #
-    #     stringi::stri_rand_shuffle(stringr::str_sub(y, p + 1, nchar(y)))
-    #
-    #   ),
-    #   y
-    # )
-
-    # without stri
-    y <- ifelse(stringr::str_detect(y, m), stringr::str_split(y, ""), y)
-    y <- sapply(y, function(z) {
-      if (length(z) > 1) {
-        z <- paste0(
-          c(z[1:p], sample(z[(p + 1):length(z)])),
-          collapse = ""
-        )
-        z
-      } else {
-        z
-      }
-    })
-
-    y
-  }
-
-  # if block chrs
-  if (!is.null(block)) {
-    if (shuffle)
-      x <- shuffle_(x, rx.match, 1)
-
-    x <- ifelse(
-      stringr::str_detect(x, rx.match),
-      paste0(
-        stringr::str_sub(x, 1, preserve),
-        stringr::str_replace_all(
-          stringr::str_sub(x, preserve + 1, nchar(x) - preserve),
-          ".",
-          block
-        ),
-        stringr::str_sub(x, nchar(x) - (preserve - 1), nchar(x))
-      ),
-      x
-    )
-
-    return(x)
-  }
-
-  # replace chrs
-  l <- sample(letters, 20)
-  d <- round(runif(6, min = 0, max = 9))
-
-  rx_digit <- paste0("[", paste0(d, collapse = ""), "]")
-  rx_lower <- paste0("[", paste0(l[1:10], collapse = ""), "]")
-  rx_upper <- paste0("[", paste0(l[11:20], collapse = ""), "]")
-
-  if (shuffle) x <- shuffle_(x, rx.match, preserve)
-
-  repl_ <- function(y, m, p, rx, v) {
-    ifelse(
-      stringr::str_detect(y, m),
-      paste0(
-        stringr::str_sub(y, 1, p),
-        stringr::str_replace_all(stringr::str_sub(y, p + 1, nchar(y)), rx, v)
-      ),
-      y
-    )
-  }
-
-  if (!is.null(x.digit)) x <- repl_(x, rx.match, preserve, rx_digit, x.digit)
-  if (!is.null(x.lower)) x <- repl_(x, rx.match, preserve, rx_lower, x.lower)
-  if (!is.null(x.upper)) x <- repl_(x, rx.match, preserve, rx_upper, x.upper)
-
-  x
+rev_row_order <- function(x) {
+  x[nrow(x):1, ]
 }

@@ -6,30 +6,26 @@
 #'   \code{Authenticate} is the first step of the \code{Authenticate}, \code{\link{Collect}} and \code{\link{Create}}
 #'   workflow.
 #'
-#'   Refer to \code{\link{Authenticate.twitter}}, \code{\link{Authenticate.youtube}} and
-#'   \code{\link{Authenticate.reddit}}, \code{\link{Authenticate.web}} for parameters and usage.
+#'   Refer to \code{\link{Authenticate.mastodon}}, \code{\link{Authenticate.youtube}},
+#'    \code{\link{Authenticate.reddit}} and \code{\link{Authenticate.web}} for parameters and usage.
 #'
 #' @param socialmedia Character string. Identifier for social media API to authenticate with. Supported social media are
-#'   \code{"twitter"}, \code{"youtube"}, \code{"reddit"} and \code{"web"}.
+#'   \code{"mastodon"}, \code{"youtube"}, \code{"reddit"} and \code{"web"}.
 #' @param ... Optional parameters to pass to functions providied by supporting R packages that are used for social media
 #'   API access.
+#' @param verbose Logical. Print messages to console. Default is \code{TRUE}.
 #'
 #' @export
-Authenticate <- function(socialmedia, ...) {
-  msg <- f_verbose(check_dots("verbose", ...))
-
+Authenticate <- function(socialmedia, ..., verbose = TRUE) {
   # searches the class list of socialmedia for matching method
   UseMethod("Authenticate", socialmedia)
 }
 
 # default function used as proxy method dispatch
 #' @export
-Authenticate.default <- function(socialmedia, ...) {
+Authenticate.default <- function(socialmedia, ..., verbose = TRUE) {
   # check if social media type is a character string
-  if (!is.character(socialmedia)) {
-    stop("Authentication social media type should be a character string.",
-         call. = FALSE)
-  }
+  if (!is.character(socialmedia)) stop("Authentication social media type should be a character string.", call. = FALSE)
 
   # check if function exists for social media type
   # todo: perhaps search authenticate methods so this can be extensible

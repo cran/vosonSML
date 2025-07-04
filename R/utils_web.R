@@ -1,7 +1,5 @@
 # get site robots.txt file
 get_domain_robots <- function(url, verbose = TRUE) {
-  msg <- f_verbose(verbose)
-
   suppressMessages(suppressWarnings({
     r <- tryCatch({
       robotstxt::robotstxt(domain = url)
@@ -20,6 +18,12 @@ get_crawl_delay <- function(crawl_delay = NULL,
                             use_delay = NULL) {
   rand_fast_delay <- runif(1, 0.5, 1.0)
 
+  # may have na
+  if (!is.null(use_delay)) {
+    if (is.na(use_delay)) use_delay <- NULL
+  }
+  
+  # return custom delay
   if (is.null(crawl_delay) && is.null(use_delay)) {
     return(rand_fast_delay)
   }

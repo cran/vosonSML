@@ -1,3 +1,106 @@
+# vosonSML 0.35.1
+
+## Bug Fixes
+- Updated reddit user-agent parameters as default to NULL. If NULL, requests use the `HTTPUserAgent` option value,
+  which is set by default to the internal package user-agent by function `vsml_ua()` during collection.
+- Automatically removed duplicate comments from youtube `Collect` data based on `CommentID`, these records can be found
+  in an attribute of the object named `duplicated`. Access using `attributes(youtube_data)$duplicated`.
+
+## Minor Changes
+- Removed the twitter section from the package vignette.
+
+# vosonSML 0.35.0
+
+## Bug Fixes
+- Changed reddit https collection method because of platform issues with the `httr` packages on Windows.
+- Removed failing S3 dispatch methods from the `Graph` function.
+- Replaced `httr` request methods with `httr2` versions.
+
+## Major Changes
+- Removed twitter functions from the package.
+
+## Minor Changes
+- Added `writeToFile` to all methods.
+- Added `Merge` support for mastodon.
+- Changed the `voson.msg` option to `voson.cat` for `cat` message output.
+- Changed `verbose` message technique and `verbose = TRUE` is now the default for most functions.
+
+# vosonSML 0.34.3
+
+## Bug Fixes
+- Disabled metadata logging that occurs when the `writeToFile` parameter of `Collect` is used. This is due to a new
+  package issue with R version 4.4.
+  
+# vosonSML 0.34.2
+
+## Bug Fixes
+- Fixed a reddit data collection issue for threads that are specified using shorter URL's without the title part and
+  that contain `continue thread` links. These links were resolving to the main thread resulting in duplication of
+  comments and thread structures.
+  
+# vosonSML 0.34.1
+
+## Minor Changes
+- Added a parameter to `Mastodon` network `Create()` function named `subtype` for creating variations to the
+  `activity` and `actor` networks. For the `activity` network a `subtype = tag` parameter can be used to create a `tag`
+  network of post tags that are colocated. For the `actor` network a `subtype = server` parameter can be used to create
+  a `server` network, which is an `actor` network reduced to server associations.
+  
+# vosonSML 0.34.0
+
+## Major Changes
+- Added `Mastodon` authentication, collection and network creation. There are two options for `Mastodon` collection, a
+  hashtag search for global or local server timeline posts that is optionally authenticated: `Collect.search.mastodon()`,
+  and a public thread collection function using input URL's that is similar to `Reddit` thread collection that requires
+  no authentication: `Collect.thread.mastodon()`. To access these methods via `Collect` an `endpoint = "search"` or
+  `endpoint = "thread"` parameter should be passed to the functions.
+- The `Mastodon` authentication and collection uses the `rtoot` package and a function has been created for importing
+  `rtoot` data into `vosonSML` called `ImportRtoot`. Imported data can be passed as input to the `Create` network functions.
+  
+## Minor Changes
+- Changed default `Reddit` request wait time range from 3 to 5 seconds, to 6 to 8 seconds to avoid a proposed platform
+  rate limit of 10 requests per minute. This value can still be manually set using the `waitTime = c(min, max)` wait time
+  range parameter.
+
+# vosonSML 0.33.2
+
+## Bug Fixes
+- Fixed a bug in the regex for `Reddit` URL parsing in which thread ID's were limited to 6 characters.
+- Fixed verbose output for `2mode` networks to use option specified method.
+- Fixed an issue with adding text to `Twitter` networks caused by missing columns in the data.
+- Added twitter tokenization functions that were recently removed from the `tidytext` and `tokenizers` packages due to
+  a change in the ICU library unicode standard and the `stringi` package
+  ([tokenizers issue #82](https://github.com/ropensci/tokenizers/issues/82)). This affects only the generation of
+  `semantic` and `2mode` twitter networks and the fix maintains their functionality until an alternative tweet
+  tokenization method is implemented. Unfortunately these two twitter network types are not supported on systems using
+  ICU library versions >= 72.0 at this time.
+- Fixed an intermitant column mismatch error in `Twitter` caused by unexpected type when data merging.
+- Fixed the number of tweet observations does not match number of users error reported with `rtweet` v1.1.
+- Fixed number of tweets requested count in verbose message for `Twitter` timeline collection.
+- Fixed a bug in `Reddit` thread collection where URL's missing trailing slashes would trigger loop protection errors.
+- Changed the default `sort` parameter value for `Reddit` threaad collection to be `NA`. Default sort order on `Reddit`
+  is not a fixed value.
+
+## Major Changes
+- Added `sort` parameter to `Reddit` collection. As this collection method is limited, it may be useful to request
+  comments in sort order using the `Reddit` sort options `top`, `new`, `controversial`, `old`, `qa` and `best`.
+- Added a `Collect.listing` function for subreddits on `Reddit`. This is not a search, however it allows complete
+  metadata for a specified number of subreddit threads to be collected in sorted order. The sort options are `hot`,
+  `top`, `new` and `rising`. There is a further time parameter `period` that can be set to `hour`, `day`, `week`,
+  `month`, `year` or `all` if `sort = top`, meaning for example, results sorted by top threads over the last week.
+
+## Minor Changes
+- Added simple log file output for `Collect` and `Merge` functions when `writeToFile = TRUE`. The log file is written in
+  the same location as the data file with the `.txt` extension appended.
+- Changed data output path option `option(voson.data = "my-data")` to now attempt to create the directory if it does
+  not exist.
+
+# vosonSML 0.32.8
+
+## Bug Fixes
+- Fixed two issues that arose from the introduction of tibbles and verbose messaging in `Collect.reddit()`.
+- Fixed an error caused by unescaped regex parameters in hyperlinks processed by `Collect.web()` ([#49](https://github.com/vosonlab/vosonSML/issues/49)).
+
 # vosonSML 0.32.7
 
 ## Major Changes

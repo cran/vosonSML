@@ -10,9 +10,9 @@
 #'   \code{"all"}, directing the crawler to follow only internal links, follow only external links (different domain to
 #'   the seed page) or follow all links. The \code{max_depth} value determines how many levels of hyperlinks to follow
 #'   from the seed site.
-#' @param writeToFile Logical. Write collected data to file. Default is \code{FALSE}.
-#' @param verbose Logical. Output additional information. Default is \code{FALSE}.
 #' @param ... Additional parameters passed to function. Not used in this method.
+#' @param writeToFile Logical. Write collected data to file. Default is \code{FALSE}.
+#' @param verbose Logical. Output additional information. Default is \code{TRUE}.
 #'
 #' @return A \code{tibble} object with class names \code{"datasource"} and \code{"web"}.
 #'
@@ -31,21 +31,25 @@
 Collect.web <-
   function(credential,
            pages = NULL,
+           ...,
            writeToFile = FALSE,
-           verbose = FALSE,
-           ...) {
+           verbose = TRUE) {
 
     prompt_and_stop(c("robotstxt", "rvest", "urltools", "xml2"), "Collect.web")
 
+    # set opts for data collection
+    opts <- get_env_opts()
+    robots_opts <- getOption("robotstxt_warn")
+    on.exit({
+      set_collect_opts(opts)
+      options(robotstxt_warn = robots_opts)
+    }, add = TRUE)
+    set_collect_opts()
+    options(robotstxt_warn = FALSE)
+    
     msg("Collecting web page hyperlinks...\n")
 
     dbg <- lgl_debug(list(...)$debug)
-
-    robots_opts <- getOption("robotstxt_warn")
-    on.exit({
-      options(robotstxt_warn = robots_opts)
-    }, add = TRUE)
-    options(robotstxt_warn = FALSE)
 
     df_results <- list()
 
@@ -65,11 +69,12 @@ Collect.web <-
 
     df_results <- purrr::map_dfr(df_results, dplyr::bind_rows)
 
-    class(df_results) <-
-      append(c("datasource", "web"), class(df_results))
-    if (writeToFile) {
-      write_output_file(df_results, "rds", "WebData", verbose = verbose)
-    }
+    class(df_results) <- append(c("datasource", "web"), class(df_results))
+    
+    # meta_log <- c(collect_log, paste0(format(Sys.time(), "%a %b %d %X %Y")))
+    meta_log <- NULL
+    
+    if (writeToFile) write_output_file(df_results, "rds", "WebData", verbose = verbose, log = meta_log)
 
     msg("Done.\n")
 
@@ -202,11 +207,13 @@ get_hyperlinks <-
         )
 
         # remove fragments or anchors
-        df <- df |> dplyr::mutate(url = ifelse(
-          !is.na(.data$parse$fragment),
-          stringr::str_replace(.data$url, paste0("#", .data$parse$fragment, "$"), ""),
-          .data$url
-        ))
+        df <- df |>
+          dplyr::mutate(url = ifelse(
+            !is.na(.data$parse$fragment),
+            stringr::str_replace(.data$url, paste0("#\\Q", .data$parse$fragment, "\\E$"), ""),
+            .data$url
+          )) |>
+          dplyr::mutate(url = stringr::str_replace(url, "/$", ""))
       }
 
       df
